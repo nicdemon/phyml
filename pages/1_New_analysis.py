@@ -1,9 +1,11 @@
 import os
 import streamlit as st
 
+from io import StringIO
 from Bio import AlignIO
 
-from ..runPhyML import RunPhyML
+from utils import *
+from runPhyML import PhyML
 
 # Page settings
 st.set_page_config(
@@ -31,11 +33,11 @@ with st.container(border = True):
                 "Select file:",
                 type = ['phy']
             )
-            if file != None:
-                sequences = AlignIO.read(file)
+            if file is not None:
+                sequences = StringIO(file.getvalue().decode("utf-8"))
         elif input == "Input box":
             sequences = st.text_area("Sequences:")
-    
+
     st.write("Data type:")
     dataTypeMap = {
         "nt": "Nucleotides",
@@ -199,25 +201,28 @@ with st.expander("Advanced options"):
             
             equilibrium = ",".join([str(fA),str(fC),str(fG),str(fT)])
 
-    ts_tvCol1, ts_tvCol2 = st.columns(2)
-    with ts_tvCol1:
-        st.write("Transition / transversion ratio:")
-        ts_tvType = st.radio(
-            "Transition / transversion ratio",
-            ["Estimated", "Fixed"],
-            label_visibility  = "collapsed",
-            horizontal = True
-        )
-    with ts_tvCol2:
-        if ts_tvType == "Fixed":
-            ts_tvRatio = st.number_input(
+    if dataType == "nt":
+        ts_tvCol1, ts_tvCol2 = st.columns(2)
+        with ts_tvCol1:
+            st.write("Transition / transversion ratio:")
+            ts_tvType = st.radio(
                 "Transition / transversion ratio",
-                min_value = 1.0,
-                format="%0.1f",
-                label_visibility  = "hidden",
+                ["Estimated", "Fixed"],
+                label_visibility  = "collapsed",
+                horizontal = True
             )
-        else:
-            ts_tvRatio = "e"
+        with ts_tvCol2:
+            if ts_tvType == "Fixed":
+                ts_tvRatio = st.number_input(
+                    "Transition / transversion ratio",
+                    min_value = 1.0,
+                    format="%0.1f",
+                    label_visibility  = "hidden",
+                )
+            else:
+                ts_tvRatio = "e"
+    else:
+        ts_tvRatio = False
     
     proportionCol1, proportionCol2 = st.columns(2)
     with proportionCol1:
@@ -335,25 +340,35 @@ with st.expander("Advanced options"):
 
 # Submit form on click
 if st.button("Launch analysis"):
-    userInputMap = {
-        "input": sequences,
-        "datatype": dataType,
-        "sequential": True if seqOrg == "Sequential" else False,
-        "multiple": nbDS,
-        "pars": True if "Yes" else False,
-        "bootstrap": bootstrap,
-        "model": model,
-        "equilibrium": equilibrium,
-        "ts/tv": ts_tvRatio,
-        "pinv": proportion,
-        "nclasses": nbSubstitutions,
-        "alpha": gamma,
-        "search": tree,
-        "params": paramsOptimisation
-    }
+    if sequences is None:
+        no_sequences_modal()
+    else:
+        userInputMap = {
+            "input": sequences,
+            "datatype": dataType,
+            "sequential": True if seqOrg == "Sequential" else False,
+            "multiple": nbDS,
+            "pars": True if "Yes" else False,
+            "bootstrap": bootstrap,
+            "model": model,
+            "equilibrium": equilibrium,
+            "ts/tv": ts_tvRatio,
+            "pinv": proportion,
+            "nclasses": nbSubstitutions,
+            "alpha": gamma,
+            "search": tree,
+            "params": paramsOptimisation
+        }
 
-    if tree == "SPR":
-        userInputMap["rand_start"] = randStart
-        userInputMap["n_rand_starts"] = nbInitialTrees
+        if tree == "SPR":
+            userInputMap["rand_start"] = randStart
+            userInputMap["n_rand_starts"] = nbInitialTrees
+
+        st.session_state["inputType"] = input
+        st.session_state["userInput"] = userInputMap
+
+        submited_modal()
+        st.switch_page(os.path.join("pages","2_Analysis_status.py"))
+        
     
-    
+# TODO: Dump copy + pasted -> file
